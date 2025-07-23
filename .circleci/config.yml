@@ -16,7 +16,7 @@ jobs:
           name: Run tests
           command: |
             . venv/bin/activate
-            pytest tests/
+            PYTHONPATH=. pytest tests/
 
 workflows:
   version: 2
