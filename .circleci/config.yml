@@ -1,25 +1,42 @@
 version: 2.1
 
-jobs:
-  test:
+executors:
+  docker-executor:
     docker:
       - image: cimg/python:3.11
+
+jobs:
+  deploy:
+    executor: docker-executor
     steps:
       - checkout
+
+      - setup_remote_docker
+
       - run:
-          name: Install dependencies
+          name: Install AWS CLI
           command: |
-            python -m venv venv
-            . venv/bin/activate
-            pip install -r requirements.txt
+            sudo apt update && sudo apt install -y awscli
+
       - run:
-          name: Run tests
+          name: Login to ECR
           command: |
-            . venv/bin/activate
-            PYTHONPATH=. pytest tests/
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            aws configure set default.region $AWS_DEFAULT_REGION
+            aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
+              docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+      - run:
+          name: Build and Push Docker Image
+          command: |
+            IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-app:latest
+            docker build -t fastapi-app .
+            docker tag fastapi-app:latest $IMAGE_URI
+            docker push $IMAGE_URI
 
 workflows:
   version: 2
-  test-and-validate:
+  deploy-app:
     jobs:
-      - test
+      - deploy
