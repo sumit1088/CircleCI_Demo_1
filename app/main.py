@@ -4,7 +4,7 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI! Now your app runner is auomatically deployed."}
+    return {"message": "Hello from FastAPI! Now your app runner is auomatically deployed..."}
 
 @app.get("/health")
 def health_check():
