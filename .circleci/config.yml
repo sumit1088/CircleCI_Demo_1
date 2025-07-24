@@ -14,9 +14,9 @@ jobs:
       - setup_remote_docker
 
       - run:
-          name: Install AWS CLI
+          name: Install AWS CLI & dependencies
           command: |
-            sudo apt-get update && sudo apt-get install -y awscli
+            sudo apt-get update && sudo apt-get install -y awscli jq
 
       - run:
           name: Authenticate with ECR
@@ -37,8 +37,136 @@ jobs:
             docker tag fastapi-app:latest $IMAGE_REPO:latest
             docker push $IMAGE_REPO:latest
 
+      - run:
+          name: Deploy to ECS
+          command: |
+            # Set values
+            CLUSTER_NAME="my-ecs-cluster"
+            SERVICE_NAME="fastapi-service"
+            TASK_FAMILY="fastapi-task-def"
+            CONTAINER_NAME="fastapi-app"
+            IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-app:latest"
+
+            # Get current task definition
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY)
+
+            # Create new task definition with updated image
+            NEW_TASK_DEF=$(echo $TASK_DEF | \
+              jq --arg IMAGE "$IMAGE" \
+              '.taskDefinition | 
+              {family: .family, 
+               networkMode: .networkMode, 
+               requiresCompatibilities: .requiresCompatibilities, 
+               cpu: .cpu, 
+               memory: .memory, 
+               executionRoleArn: .executionRoleArn, 
+               containerDefinitions: [.containerDefinitions[0] + {image: $IMAGE}] 
+              }')
+
+            # Register new task definition
+            NEW_TASK_REVISION=$(aws ecs register-task-definition \
+              --cli-input-json "$(echo $NEW_TASK_DEF)" \
+              --query 'taskDefinition.taskDefinitionArn' --output text)
+
+            # Update service to use new task revision
+            aws ecs update-service \
+              --cluster $CLUSTER_NAME \
+              --service $SERVICE_NAME \
+              --task-definition $NEW_TASK_REVISION
+
 workflows:
   version: 2
   deploy-app:
     jobs:
       - deploy
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# app runner config file# This file is used to configure the CircleCI pipeline for deploying a FastAPI application to AWS App Runner.
+# It includes steps for building the Docker image, authenticating with AWS ECR, and pushing the image to ECR.
+
+# version: 2.1
+
+# executors:
+#   docker-executor:
+#     docker:
+#       - image: cimg/python:3.11
+
+# jobs:
+#   deploy:
+#     executor: docker-executor
+#     steps:
+#       - checkout
+
+#       - setup_remote_docker
+
+#       - run:
+#           name: Install AWS CLI
+#           command: |
+#             sudo apt-get update && sudo apt-get install -y awscli
+
+#       - run:
+#           name: Authenticate with ECR
+#           command: |
+#             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+#             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+#             aws configure set default.region $AWS_DEFAULT_REGION
+
+#             aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
+#               docker login --username AWS \
+#               --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+#       - run:
+#           name: Build and Push Docker Image
+#           command: |
+#             IMAGE_REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-app"
+#             docker build -t fastapi-app .
+#             docker tag fastapi-app:latest $IMAGE_REPO:latest
+#             docker push $IMAGE_REPO:latest
+
+# workflows:
+#   version: 2
+#   deploy-app:
+#     jobs:
+#       - deploy
