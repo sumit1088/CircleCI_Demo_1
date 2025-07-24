@@ -16,24 +16,26 @@ jobs:
       - run:
           name: Install AWS CLI
           command: |
-            sudo apt update && sudo apt install -y awscli
+            sudo apt-get update && sudo apt-get install -y awscli
 
       - run:
-          name: Login to ECR
+          name: Authenticate with ECR
           command: |
             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
             aws configure set default.region $AWS_DEFAULT_REGION
+
             aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
-              docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+              docker login --username AWS \
+              --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
       - run:
           name: Build and Push Docker Image
           command: |
-            IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-app:latest
+            IMAGE_REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-app"
             docker build -t fastapi-app .
-            docker tag fastapi-app:latest $IMAGE_URI
-            docker push $IMAGE_URI
+            docker tag fastapi-app:latest $IMAGE_REPO:latest
+            docker push $IMAGE_REPO:latest
 
 workflows:
   version: 2
